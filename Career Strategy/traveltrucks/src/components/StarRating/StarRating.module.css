@@ -1,0 +1,31 @@
+.wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stars {
+  display: flex;
+  gap: 2px;
+}
+
+.star {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.filled {
+  color: var(--color-star);
+}
+
+.empty {
+  color: var(--color-border);
+}
+
+.count {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-dark);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

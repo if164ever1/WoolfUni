@@ -82,7 +82,7 @@ touch install_dev_tools.sh
 
 The file `install_dev_tools.sh` was created in the `~/Documents/Linux` directory using the `touch` command. The file manager on the left confirms the file appeared in the folder.
 
-![Creating the script file](./lesson%203/screenshots/screenshot_1.png)
+![Creating the script file](./screenshots/screenshot_1.png)
 
 ### Step 2 — Make the script executable
 
@@ -92,7 +92,7 @@ chmod u+x install_dev_tools.sh
 
 After running `chmod u+x`, the file icon in the file manager changed from a plain document icon to a terminal/executable icon, confirming the permission was applied successfully.
 
-![Making the script executable](./lesson%203/screenshots/screenshot_2.png)
+![Making the script executable](./screenshots/screenshot_2.png)
 
 ### Step 3 — Run the script
 
@@ -115,7 +115,7 @@ The script was opened in VS Code and executed from the integrated terminal. The 
   source .venv/bin/activate
   ```
 
-![Running the script and verifying installation](./lesson%203/screenshots/screenshot_3.png)
+![Running the script and verifying installation](./screenshots/screenshot_3.png)
 
 ---
 

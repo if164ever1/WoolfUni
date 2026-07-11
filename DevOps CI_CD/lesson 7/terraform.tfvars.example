@@ -1,0 +1,10 @@
+aws_region             = "us-west-2"
+project_name           = "lesson-7"
+environment            = "dev"
+existing_vpc_name      = "lesson-5-vpc"
+cluster_name           = "lesson-7-eks"
+ecr_repository_name    = "lesson-7-django"
+node_instance_types    = ["t3.medium"]
+node_desired_size      = 2
+node_min_size          = 2
+node_max_size          = 4

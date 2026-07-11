@@ -1,4 +1,4 @@
-# Lesson 8–9 — Jenkins, Kaniko, ECR, Helm, Terraform and Argo CD
+# Lesson 9 — Jenkins, Kaniko, ECR, Helm, Terraform and Argo CD
 
 This project implements a complete CI/CD chain for a Django application:
 
@@ -39,10 +39,6 @@ The delivery archive contains two repositories:
 - `application-repo`: this directory.
 - `gitops-repo`: sibling directory containing the chart watched by Argo CD.
 
-Recommended GitHub setup:
-
-- `if164ever1/WoolfUni`, branch `lesson-8-9`, path `DevOps CI_CD/lesson-8-9/`.
-- `if164ever1/lesson-8-9-gitops`, branch `main`.
 
 ## Project structure
 
@@ -114,29 +110,29 @@ Jenkins is configured from Git and automatically queues its first build. Therefo
 Copy the contents of `application-repo/` into:
 
 ```text
-WoolfUni/DevOps CI_CD/lesson-8-9/
+WoolfUni/DevOps CI_CD/lesson-9/
 ```
 
 Then, from the `WoolfUni` repository root:
 
 ```powershell
-git checkout -b lesson-8-9
-git add "DevOps CI_CD/lesson-8-9"
+git checkout -b lesson-9
+git add "DevOps CI_CD/lesson-9"
 git commit -m "Add lesson 8-9 Jenkins and Argo CD CI/CD project"
 git push -u origin lesson-8-9
 ```
 
 ## 1. Create the separate GitOps repository
 
-Create a GitHub repository named `lesson-8-9-gitops`, then copy the sibling `gitops-repo/` contents into it and push `main`:
+Create a GitHub repository named `lesson-9-gitops`, then copy the sibling `gitops-repo/` contents into it and push `main`:
 
 ```powershell
 cd ..\gitops-repo
 git init
 git add .
-git commit -m "Initialize lesson 8-9 GitOps chart"
+git commit -m "Initialize lesson 9 GitOps chart"
 git branch -M main
-git remote add origin https://github.com/if164ever1/lesson-8-9-gitops.git
+git remote add origin https://github.com/if164ever1/lesson-9-gitops.git
 git push -u origin main
 ```
 
@@ -145,7 +141,7 @@ git push -u origin main
 Use a fine-grained GitHub personal access token with:
 
 - Read access to the source repository.
-- Read and write `Contents` access to `lesson-8-9-gitops`.
+- Read and write `Contents` access to `lesson-9-gitops`.
 
 Do not write the token into committed files. In PowerShell:
 
@@ -246,7 +242,7 @@ terraform output -raw jenkins_admin_username
 terraform output -raw jenkins_admin_password
 ```
 
-Terraform/JCasC automatically creates and queues the first `django-cicd` build, then polls the source branch every five minutes. The Jenkinsfile detects whether it runs from this directory as a standalone repository or from `DevOps CI_CD/lesson-8-9/` inside `WoolfUni`.
+Terraform/JCasC automatically creates and queues the first `django-cicd` build, then polls the source branch every five minutes. The Jenkinsfile detects whether it runs from this directory as a standalone repository or from `DevOps CI_CD/lesson-9/` inside `WoolfUni`.
 
 Check the agent and controller:
 
@@ -273,7 +269,7 @@ Verify ECR:
 
 ```powershell
 aws ecr list-images `
-  --repository-name lesson-8-9-django `
+  --repository-name lesson-9-django `
   --region us-west-2 `
   --output table
 ```
@@ -387,33 +383,3 @@ kubectl get pods -n django-app -w
 ## Known external prerequisite
 
 The code can be validated without AWS, but it cannot create cloud resources while the AWS account reports service-subscription errors. Resolve AWS account activation first.
-
-## Submission
-
-Primary repository/branch:
-
-```text
-https://github.com/if164ever1/WoolfUni/tree/lesson-8-9/DevOps%20CI_CD/lesson-8-9
-```
-
-GitOps repository:
-
-```text
-https://github.com/if164ever1/lesson-8-9-gitops
-```
-
-ZIP name:
-
-```text
-lesson-8-9_Ігор_Задор.zip
-```
-
-Use `docs/evidence-checklist.md` for screenshots.
-
-## Cleanup
-
-```powershell
-terraform destroy
-```
-
-The S3 state bucket and DynamoDB lock table use `prevent_destroy = true` and are intentionally retained. Remove that lifecycle protection only when you deliberately want to delete the backend.

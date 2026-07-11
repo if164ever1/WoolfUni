@@ -1,0 +1,8 @@
+1. Check Argo CD status:
+   kubectl get applications -n argocd
+
+2. Check the workload:
+   kubectl get deployment,service,hpa,pdb -n {{ .Release.Namespace }}
+
+3. Obtain the LoadBalancer hostname:
+   kubectl get service {{ include "django-app.fullname" . }} -n {{ .Release.Namespace }}

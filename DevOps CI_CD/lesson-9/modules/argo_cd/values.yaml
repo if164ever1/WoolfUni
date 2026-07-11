@@ -1,0 +1,39 @@
+crds:
+  install: true
+  keep: true
+
+configs:
+  cm:
+    admin.enabled: true
+    timeout.reconciliation: 60s
+  params:
+    server.insecure: true
+
+server:
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+controller:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+repoServer:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

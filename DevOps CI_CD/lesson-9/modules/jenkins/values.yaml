@@ -1,0 +1,41 @@
+controller:
+  numExecutors: 0
+  serviceType: ClusterIP
+  installLatestPlugins: false
+  installLatestSpecifiedPlugins: false
+  installPlugins:
+    - kubernetes:4423.vb_59f230b_ce53
+    - workflow-aggregator:608.v67378e9d3db_1
+    - git:5.10.1
+    - configuration-as-code:2089.v970a_0b_a_8cc6d
+    - job-dsl:1.93
+    - credentials-binding:702.vfe613e537e88
+    - pipeline-stage-view:2.38
+  JCasC:
+    defaultConfig: true
+    overwriteConfiguration: true
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+
+persistence:
+  enabled: true
+  storageClass: jenkins-gp3
+  size: 10Gi
+
+rbac:
+  create: true
+  readSecrets: false
+
+serviceAccount:
+  create: true
+
+serviceAccountAgent:
+  create: true
+
+agent:
+  enabled: true

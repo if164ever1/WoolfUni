@@ -1,0 +1,3 @@
+aws_region       = "us-west-2"
+state_bucket_name = "ihor-zador-lesson-8-9-tfstate-REPLACE"
+lock_table_name   = "lesson-8-9-terraform-locks"

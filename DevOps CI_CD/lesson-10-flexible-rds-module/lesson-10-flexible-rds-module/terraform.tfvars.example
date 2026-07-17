@@ -1,0 +1,29 @@
+aws_region   = "us-west-2"
+project_name = "lesson-10"
+environment  = "dev"
+
+state_bucket_name     = "your-name-terraform-state"
+state_lock_table_name = "terraform-locks"
+
+existing_vpc_name           = "lesson-5-vpc"
+public_subnet_name_pattern  = "lesson-5-vpc-public-*"
+private_subnet_name_pattern = "lesson-5-vpc-private-*"
+
+# Previous-homework infrastructure is kept but disabled by default for this RDS-focused task.
+enable_ecr = false
+enable_eks = false
+
+# Default: standard PostgreSQL RDS.
+use_aurora                = false
+db_engine                 = "postgres"
+db_engine_version         = "16.3"
+db_parameter_group_family = "postgres16"
+db_instance_class         = "db.t3.micro"
+db_multi_az               = false
+
+# AWS manages the master password in Secrets Manager by default.
+manage_master_user_password = true
+# db_password = "replace-only-when-managing-password-yourself"
+
+rds_allowed_cidr_blocks        = []
+rds_allowed_security_group_ids = []

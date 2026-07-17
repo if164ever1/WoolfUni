@@ -1,0 +1,96 @@
+controller:
+  serviceType: ClusterIP
+
+  admin:
+    username: "${admin_username}"
+    password: "${admin_password}"
+
+  installLatestPlugins: true
+  installPlugins:
+    - kubernetes:latest
+    - workflow-aggregator:latest
+    - git:latest
+    - configuration-as-code:latest
+    - job-dsl:latest
+    - credentials-binding:latest
+    - pipeline-stage-view:latest
+
+  containerEnv:
+    - name: GITHUB_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: "${github_secret_name}"
+          key: username
+    - name: GITHUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: "${github_secret_name}"
+          key: token
+
+  JCasC:
+    defaultConfig: true
+    configScripts:
+      final-project: |
+        credentials:
+          system:
+            domainCredentials:
+              - credentials:
+                  - usernamePassword:
+                      scope: GLOBAL
+                      id: "github-token"
+                      username: "$${GITHUB_USERNAME}"
+                      password: "$${GITHUB_TOKEN}"
+                      description: "GitHub token for the final DevOps GitOps update"
+        jenkins:
+          globalNodeProperties:
+            - envVars:
+                env:
+                  - key: "AWS_REGION"
+                    value: "${aws_region}"
+                  - key: "SOURCE_PROJECT_PATH"
+                    value: "${source_project_path}"
+                  - key: "ECR_REPOSITORY_URL"
+                    value: "${ecr_repository_url}"
+                  - key: "GITOPS_REPO_URL"
+                    value: "${gitops_repository_url}"
+                  - key: "GITOPS_BRANCH"
+                    value: "${gitops_branch}"
+                  - key: "GITOPS_VALUES_PATH"
+                    value: "${gitops_values_path}"
+                  - key: "JENKINS_AGENT_SERVICE_ACCOUNT"
+                    value: "${agent_service_account}"
+        jobs:
+          - script: >
+              pipelineJob('django-cicd') {
+                definition {
+                  cpsScm {
+                    scm {
+                      git {
+                        remote {
+                          url('${source_repository_url}')
+                          credentials('github-token')
+                        }
+                        branch('${source_branch}')
+                      }
+                    }
+                    scriptPath('${jenkinsfile_path}')
+                    lightweight(true)
+                  }
+                }
+                triggers { scm('H/5 * * * *') }
+              }
+              queue('django-cicd')
+
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "3Gi"
+
+persistence:
+  enabled: false
+
+agent:
+  enabled: true

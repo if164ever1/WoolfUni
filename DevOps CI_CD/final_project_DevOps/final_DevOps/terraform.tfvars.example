@@ -1,0 +1,60 @@
+# Copy this file to terraform.tfvars and review the values before deployment.
+
+project_name = "final-devops"
+environment  = "dev"
+aws_region   = "us-west-2"
+
+# MUST be globally unique.
+state_bucket_name     = "replace-with-globally-unique-final-devops-state-bucket"
+state_lock_table_name = "terraform-locks"
+
+vpc_cidr                = "10.40.0.0/16"
+availability_zone_count = 3
+enable_nat_gateway      = true
+single_nat_gateway      = true
+
+ecr_repository_name = "final-devops-django"
+ecr_force_delete    = true
+
+# Restrict this to your current public IP in CIDR form for better security, for example 203.0.113.10/32.
+eks_kubernetes_version          = "1.36"
+eks_cluster_log_retention_days = 7
+eks_public_access_cidrs         = ["0.0.0.0/0"]
+
+# Two nodes are useful for Jenkins + Argo CD + monitoring. Increase if pods remain Pending.
+eks_node_instance_types = ["t3.medium"]
+eks_node_desired_size   = 2
+eks_node_min_size       = 2
+eks_node_max_size       = 4
+
+# Standard PostgreSQL RDS is the lowest-cost default for the assignment.
+use_aurora                        = false
+db_engine                         = "postgres"
+db_engine_version                 = "16.3"
+db_parameter_group_family         = "postgres16"
+db_instance_class                 = "db.t3.micro"
+db_manage_master_user_password    = false
+db_multi_az                       = false
+aurora_instance_count             = 1
+
+# Replace with the repository/branch where this final project is pushed.
+source_repository_url    = "https://github.com/REPLACE_ME/REPLACE_ME.git"
+source_project_path      = "."
+source_repository_branch = "final-project"
+jenkinsfile_path         = "Django/Jenkinsfile"
+
+# The same repository may be used for GitOps in this course project.
+gitops_repository_url    = "https://github.com/REPLACE_ME/REPLACE_ME.git"
+gitops_repository_branch = "final-project"
+gitops_chart_path        = "charts/django-app"
+gitops_values_path       = "charts/django-app/values.yaml"
+
+# Do not put a real token here. Set it before terraform apply:
+# PowerShell: $env:TF_VAR_github_token = "github_pat_..."
+# Bash:       export TF_VAR_github_token="github_pat_..."
+github_username = "git"
+
+additional_tags = {
+  Course = "DevOps"
+  Owner  = "student"
+}

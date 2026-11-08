@@ -1,0 +1,11 @@
+flowchart LR
+    DEV[Developer push to source branch] --> J[Jenkins controller on EKS]
+    J --> A[Kubernetes agent pod]
+    A --> K[Kaniko builds image]
+    K --> ECR[Amazon ECR]
+    A --> G[Git container updates values.yaml]
+    G --> GR[GitOps repository main]
+    GR --> ARGO[Argo CD reconciliation]
+    ARGO --> HELM[Helm render]
+    HELM --> K8S[Django Deployment / Service / HPA]
+    K8S --> LB[AWS Load Balancer]

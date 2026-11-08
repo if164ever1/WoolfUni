@@ -1,0 +1,16 @@
+path: D:\IT\WOOLF\WoolfUni\Deep Learning for CV and NLP\HW8
+train: train/images
+val: valid/images
+test: test/images
+nc: 10
+names:
+- door
+- cabinetDoor
+- refrigeratorDoor
+- window
+- chair
+- table
+- cabinet
+- couch
+- openedDoor
+- pole

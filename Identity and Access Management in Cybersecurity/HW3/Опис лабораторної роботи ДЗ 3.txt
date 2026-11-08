@@ -1,0 +1,1230 @@
+Лабораторна робота
+Розгортання Active Directory
+
+
+
+Ця робота продовжує сценарій попередньої лабораторної.
+
+У Northstar Labs уже працює Keycloak — компонент, який надалі забезпечуватиме автентифікацію користувачів у корпоративних застосунках. Проте централізованого каталогу працівників у компанії досі немає: облікові записи створюються окремо в кожній системі, а дані про людей, їхні підрозділи та права доступу ніде не зведені разом.
+
+Через це неможливо швидко відповісти на прості запитання: скільки всього співробітників має доступ до фінансових систем, у якому підрозділі працює конкретна людина, які доступи потрібно забрати під час звільнення.
+
+Компанія розгортає Active Directory як єдине джерело даних про користувачів. Надалі Keycloak буде підключений до цього каталогу через LDAP, і автентифікація в корпоративних застосунках спиратиметься на доменні облікові записи.
+
+Ваша роль. Ви — інженер, який розгортає контролер домену й наповнює каталог початковою структурою.
+
+Основна мета роботи:
+
+створити окрему VM з Windows Server;
+встановити Active Directory Domain Services;
+створити домен identity-lab.local;
+налаштувати DNS;
+створити організаційні підрозділи, групи та тестових користувачів;
+перевірити роботу домену;
+підготувати середовище до подальшого підключення Keycloak через LDAP.
+Очікуваний результат. Після завершення роботи має працювати така схема:
+
+Active Directory domain: identity-lab.local
+
+Domain Controller:
+dc01.identity-lab.local
+
+Keycloak:
+sso.identity-lab.local
+
+У каталозі мають бути створені:
+
+identity-lab.local
+└── Northstar
+    ├── Users
+    │   ├── Engineering
+    │   ├── Finance
+    │   └── IT
+    ├── Groups
+    └── Service Accounts
+
+Також мають бути створені тестові користувачі та групи.
+
+Виберіть варіант розгортання
+
+Віртуальну машину з Windows Server можна створити одним із двох способів. Виконайте лише один із них:
+
+Частина 1А — розгортання у Google Cloud Platform;
+Частина 1Б — розгортання локально у VirtualBox.
+
+
+Починаючи з розділу «Частина 2. Початкове налаштування Windows Server» обидва шляхи збігаються. У кількох подальших кроках залишаються короткі уточнення для кожного варіанта — вони позначені підзаголовками Для GCP і Для VirtualBox.
+
+Використовуйте той самий варіант, що й у попередній лабораторній: Windows Server і Keycloak повинні бути в одній мережі.
+
+⚠️ Якщо якийсь крок не спрацював
+Дивіться окремий документ «Troubleshooting лабораторних робіт» у матеріалах курсу. У тексті інструкції є посилання на його конкретні пункти.
+
+
+Позначення адрес у тексті. Замість зразків підставляйте власні значення:
+
+AD_INTERNAL_IP — внутрішня IP-адреса Windows Server (контролера домену);
+KEYCLOAK_INTERNAL_IP — внутрішня IP-адреса Keycloak VM з попередньої лабораторної.
+
+
+🟦 ЧАСТИНА 1А. РОЗГОРТАННЯ WINDOWS SERVER У GOOGLE CLOUD PLATFORM
+
+1. Відкрийте Compute Engine
+
+Увійдіть у Google Cloud Platform.
+
+Переконайтеся, що вибрано той самий проєкт, у якому було створено Keycloak VM. Це спростить мережеву взаємодію між двома серверами.
+
+Перейдіть до:
+
+Compute Engine → VM instances
+
+Натисніть:
+
+Create instance
+
+
+
+2. Вкажіть основні параметри VM
+
+Використайте такі значення:
+
+Name — ad-server
+Region — та сама, що у Keycloak VM
+Zone — будь-яка доступна в обраному регіоні
+Machine type — e2-standard-2 (2 vCPU, 8 GB RAM)
+Для лабораторного середовища 2 vCPU і 8 GB RAM достатньо для Windows Server, AD DS, DNS та невеликої кількості тестових користувачів.
+
+
+3. Оберіть операційну систему
+
+У секції OS and storage натисніть Change і вкажіть:
+
+Operating system — Windows Server
+Version — Windows Server 2025 Datacenter
+Boot disk type — Standard persistent disk
+Size — 50 GB
+Натисніть:
+
+Select
+
+
+
+4. Налаштуйте мережеві параметри
+
+Перейдіть до:
+
+Advanced options → Networking
+
+4.1. У полі Network tags додайте:
+
+ad-server
+
+4.2. Для мережевого інтерфейсу використайте ту саму VPC і підмережу, що й для Keycloak VM:
+
+Network: default
+Subnetwork: default
+
+Або іншу спільну VPC, якщо вона використовувалася в попередній лабораторній.
+
+4.3. Не вказуйте hostname у форматі ad-server.local.
+
+Поки що ім’я сервера буде DC01. Після створення домену повне ім’я стане dc01.identity-lab.local.
+
+
+
+5. Створіть VM
+
+Перевірте параметри та натисніть:
+
+Create
+
+Дочекайтеся появи VM у списку зі статусом:
+
+Running
+
+
+
+6. Зарезервуйте внутрішню IP-адресу
+
+Для Active Directory важлива стабільна внутрішня IP-адреса, а не лише зовнішня.
+
+6.1. Відкрийте VM:
+
+Compute Engine → VM instances → ad-server
+
+6.2. Знайдіть її внутрішню IP-адресу. Приклад:
+
+10.128.0.20
+
+6.3. Зупиніть VM, якщо інтерфейс GCP вимагає цього для редагування мережевого інтерфейсу.
+
+6.4. Перейдіть до редагування мережевого інтерфейсу та змініть тип внутрішньої адреси з Ephemeral на Static.
+
+6.5. Назвіть адресу:
+
+ad-server-internal-ip
+
+Ця адреса надалі використовуватиметься:
+
+як IP контролера домену;
+як DNS-сервер;
+для LDAP-підключення Keycloak;
+для перевірки мережевої взаємодії.
+
+
+7. Налаштуйте RDP-доступ
+
+Дізнайтеся свою публічну IP-адресу, наприклад через https://2ip.ua/ua/.
+
+Створіть firewall-правило:
+
+gcloud compute firewall-rules create allow-rdp-to-ad-server \
+  --direction=INGRESS \
+  --priority=1000 \
+  --network=default \
+  --action=ALLOW \
+  --rules=tcp:3389 \
+  --source-ranges=YOUR_PUBLIC_IP/32 \
+  --target-tags=ad-server
+
+Замініть YOUR_PUBLIC_IP на свою публічну IP-адресу.
+
+Не відкривайте RDP для 0.0.0.0/0.
+
+
+8. Дозвольте внутрішню взаємодію між VM
+
+Якщо Keycloak і Windows Server розташовані в одній VPC, перевірте, чи дозволений внутрішній трафік між VM.
+
+Для лабораторного середовища можна створити правило для приватної підмережі:
+
+gcloud compute firewall-rules create allow-identity-lab-internal \
+  --direction=INGRESS \
+  --priority=1000 \
+  --network=default \
+  --action=ALLOW \
+  --rules=tcp,udp,icmp \
+  --source-ranges=YOUR_SUBNET_CIDR \
+  --target-tags=ad-server,keycloak-server
+
+Приклад приватної підмережі:
+
+10.128.0.0/20
+
+Використовуйте CIDR саме своєї підмережі.
+
+Це правило призначене лише для лабораторної внутрішньої мережі. Воно не відкриває сервіси для всього інтернету.
+
+
+
+9. Створіть Windows credentials
+
+Відкрийте налаштування VM ad-server і натисніть:
+
+Set Windows password
+
+Вкажіть username:
+
+admin
+
+Збережіть згенерований пароль у надійному місці. Він знадобиться для першого входу через RDP.
+
+
+
+10. Підключіться через RDP
+
+Завантажте RDP-файл або використайте Remote Desktop Client.
+
+Підключіться до зовнішньої IP-адреси VM та введіть:
+
+Username: admin
+Password: згенерований GCP пароль
+
+
+
+✅ Це останній крок для хмарного варіанта розгортання
+Розділ «Частина 1Б. Розгортання Windows Server у VirtualBox» виконувати не потрібно — пропустіть його повністю.
+Наступний крок: розділ «Частина 2. Початкове налаштування Windows Server».
+
+
+🟦 ЧАСТИНА 1Б. РОЗГОРТАННЯ WINDOWS SERVER У VIRTUALBOX
+
+Для локального варіанта Windows Server і Keycloak повинні мати спільну приватну мережу.
+
+Рекомендована схема:
+
+Keycloak VM
+├── Adapter 1: NAT
+└── Adapter 2: Host-only
+
+Windows Server VM
+├── Adapter 1: NAT
+└── Adapter 2: Host-only
+
+NAT забезпечує доступ до інтернету. Host-only Adapter забезпечує стабільну мережу між Keycloak VM, Windows Server VM і основним комп’ютером.
+
+
+
+1. Підготуйте Host-only Network
+
+1.1. У VirtualBox відкрийте:
+
+Tools → Network
+
+або:
+
+File → Tools → Network Manager
+
+
+
+
+
+
+1.2. Перейдіть до Host-only Networks і створіть мережу. Наприклад:
+
+Network: 192.168.56.0/24
+Host address: 192.168.56.1
+
+DHCP можна залишити увімкненим на етапі встановлення, але надалі сервери отримають статичні адреси.
+
+1.3. Заплануйте адреси:
+
+Keycloak VM:       192.168.56.10
+Domain Controller: 192.168.56.20
+Host computer:     192.168.56.1
+
+
+
+2. Додайте Host-only Adapter до Keycloak VM
+
+2.1. Зупиніть Keycloak VM і відкрийте:
+
+Keycloak VM → Settings → Network
+
+2.2. Для Adapter 1 встановіть:
+
+Attached to: NAT
+
+
+
+
+
+
+2.3. Увімкніть Adapter 2:
+
+Enable Network Adapter: enabled
+Attached to: Host-only Adapter
+Name: створена host-only мережа
+Cable Connected: enabled
+
+
+
+
+
+
+
+
+2.4. Запустіть Keycloak VM і перевірте мережеві інтерфейси:
+
+ip -4 addr
+
+2.5. Перегляньте назви інтерфейсів:
+
+ip link
+
+Приклад:
+
+enp0s3 — NAT
+enp0s8 — Host-only
+
+
+
+
+
+
+Зверніть увагу, що у вас зміниться адреса сервера. Тому конфігурації в /etc/hosts потрібно буде замінити на актуальну адресу, отриману за допомогою команди ip -4 addr
+
+Наприклад, 192.168.56.3 у прикладі
+
+
+
+3. Завантажте Windows Server ISO
+
+Завантажте ISO-образ:
+
+Windows Server 2025 Datacenter Evaluation — Desktop Experience
+
+Для лабораторної потрібна версія з графічним інтерфейсом. Не обирайте Server Core, оскільки подальша інструкція використовує Server Manager і графічні консолі.
+
+4. Створіть Windows Server VM
+
+У VirtualBox натисніть New і вкажіть:
+
+Name — identity-ad-lab
+ISO Image — Windows Server 2025 ISO
+Type — Microsoft Windows
+Version — Windows 2025 (64-bit)
+Не вмикайте:
+
+Procceed with Unattended Installation
+
+
+
+
+
+
+5. Налаштуйте ресурси та диск
+
+5.1. Виділіть ресурси:
+
+Base Memory: 8192 MB
+Processors: 2
+
+5.2. Створіть диск:
+
+Disk size — 50 GB
+Disk format — VDI
+Allocation — Dynamically allocated
+Не виділяйте віртуальній машині більше половини ресурсів фізичного комп’ютера.
+
+
+
+6. Налаштуйте мережу VM
+
+До запуску VM відкрийте:
+
+Settings → Network
+
+6.1. Adapter 1:
+
+Enable Network Adapter: enabled
+Attached to: NAT
+Cable Connected: enabled
+
+
+
+
+
+
+
+
+6.2. Adapter 2:
+
+Enable Network Adapter: enabled
+Attached to: Host-only Adapter
+Name: та сама мережа, що у Keycloak VM
+Cable Connected: enabled
+
+
+
+
+
+
+Натисніть:
+
+OK
+
+
+
+7. Встановіть Windows Server
+
+7.1. Запустіть VM. На екрані інсталяції оберіть:
+
+Windows Server 2025 Datacenter Evaluation
+Desktop Experience
+
+Не обирайте варіант без Desktop Experience.
+
+
+
+
+
+
+7.2. Прийміть ліцензійну угоду.
+
+7.3. Оберіть тип встановлення:
+
+Custom: Install Microsoft Server Operating System only
+
+7.4. Виберіть створений віртуальний диск і дочекайтеся завершення встановлення.
+
+
+
+8. Встановіть пароль Administrator
+
+Після першого завантаження система попросить задати пароль для облікового запису:
+
+Administrator
+
+Створіть окремий складний пароль і збережіть його. Увійдіть до Windows Server.
+
+✅ Це останній крок для локального варіанта розгортання
+Розділ «Частина 1А. Розгортання Windows Server у Google Cloud Platform» виконувати не потрібно.
+Наступний крок: розділ «Частина 2. Початкове налаштування Windows Server».
+
+
+🟩 ЧАСТИНА 2. ПОЧАТКОВЕ НАЛАШТУВАННЯ WINDOWS SERVER
+
+Ця частина спільна для обох варіантів розгортання.
+
+
+
+1. Перейменуйте сервер
+
+1.1. Відкрийте:
+
+Server Manager → Local Server
+
+
+
+
+
+
+1.2. Натисніть на поточне значення біля Computer name і виберіть Change.
+
+1.3. Введіть:
+
+DC01
+
+
+
+
+
+
+1.4. Натисніть OK і погодьтеся на перезавантаження.
+
+1.5. Після перезапуску увійдіть знову.
+
+
+
+2. Перевірте ім’я сервера
+
+Відкрийте PowerShell від імені адміністратора та виконайте:
+
+hostname
+
+Очікуваний результат:
+
+DC01
+
+
+
+3. Перевірте мережеві адаптери
+
+Виконайте:
+
+Get-NetAdapter
+
+Для GCP зазвичай буде один основний адаптер. Для VirtualBox мають відображатися два: адаптер NAT і адаптер Host-only.
+
+Щоб побачити IP-конфігурацію:
+
+Get-NetIPConfiguration
+
+
+
+
+
+
+4. Налаштуйте стабільну внутрішню IP-адресу$
+
+Active Directory вимагає, щоб адреса контролера домену не змінювалася. Далі порядок дій залежить від варіанта розгортання.
+
+
+
+Для GCP
+
+Внутрішня IP-адреса вже була зарезервована на рівні мережевого інтерфейсу, тому всередині Windows нічого змінювати не потрібно. Не задавайте довільну іншу адресу.
+
+Перевірте наявну:
+
+Get-NetIPAddress -AddressFamily IPv4
+
+Знайдіть адресу, яка відповідає зарезервованій в GCP. Приклад:
+
+10.128.0.20
+
+
+
+Для VirtualBox
+
+Для Host-only Adapter встановіть:
+
+IP address: AD_INTERNAL_IP
+Subnet mask: 255.255.255.0
+Default gateway: залиште порожнім
+Preferred DNS server: AD_INTERNAL_IP
+
+4.1. Відкрийте:
+
+Control Panel → Network and Internet → Network and Sharing Center → Change adapter settings
+
+4.2. Визначте Host-only Adapter. Щоб не переплутати адаптери, можна перейменувати їх:
+
+Ethernet → NAT
+Ethernet 2 → Identity Lab
+
+4.3. Відкрийте властивості адаптера:
+
+Identity Lab → Properties → Internet Protocol Version 4 (TCP/IPv4) → Properties
+
+4.4. Вкажіть IP-адресу, маску й DNS зі списку вище.
+
+На цьому етапі DNS ще не встановлено, але після promotion сервер використовуватиме власну DNS-службу.
+
+Контролер домену може використовувати 127.0.0.1 для звернення до власної DNS-служби. У цій лабораторній використовується його стабільна внутрішня IP-адреса, щоб однакове значення можна було застосувати також на Keycloak VM.
+4.5. Перевірте результат:
+
+ipconfig
+
+Для VirtualBox має відображатися AD_INTERNAL_IP, для GCP — зарезервована внутрішня адреса.
+
+
+
+
+
+
+5. Перевірте зв’язок з Keycloak VM
+
+5.1. На Windows Server у PowerShell виконайте:
+
+ping KEYCLOAK_INTERNAL_IP
+
+Наприклад:
+
+ping 10.0.2.15
+
+5.2. На Keycloak VM перевірте зворотний зв’язок:
+
+ping -c 4 AD_INTERNAL_IP
+
+⚠️ Якщо ping не проходить
+Див. документ «Troubleshooting лабораторних робіт», п. 3.4 «Keycloak VM і Windows Server не бачать одна одну».
+
+
+6. Встановіть оновлення Windows
+
+6.1. Відкрийте:
+
+Settings → Windows Update
+
+6.2. Натисніть Check for updates і встановіть доступні оновлення.
+
+6.3. За потреби перезавантажте сервер.
+
+Перед встановленням AD DS переконайтеся, що сервер знову має правильну внутрішню IP-адресу.
+
+
+
+🟨 ЧАСТИНА 3. ВСТАНОВЛЕННЯ AD DS І СТВОРЕННЯ ДОМЕНУ
+
+
+
+1. Встановіть ролі AD DS і DNS Server
+
+1.1. Відкрийте Server Manager. Після входу він зазвичай відкривається автоматично; якщо ні — запустіть через Start Menu.
+
+
+
+
+1.2. Натисніть:
+
+Manage → Add Roles and Features
+
+
+
+
+
+
+На сторінці Before You Begin натисніть Next.
+
+1.3. Оберіть тип інсталяції:
+
+Role-based or feature-based installation
+
+1.4. Переконайтеся, що вибрано сервер DC01, і натисніть Next.
+
+1.5. У списку ролей увімкніть:
+
+Active Directory Domain Services
+
+У діалоговому вікні натисніть Add Features.
+
+1.6. Також увімкніть:
+
+DNS Server
+
+Підтвердьте додавання необхідних компонентів і натискайте Next до сторінки підтвердження.
+
+
+
+
+
+
+1.7. На сторінці Confirmation увімкніть:
+
+Restart the destination server automatically if required -> Yes
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1.8. Натисніть Install і дочекайтеся завершення. Не закривайте Server Manager до завершення операції.
+
+
+
+
+
+
+2. Створіть Active Directory forest
+
+2.1. Після встановлення ролей у Server Manager, з’явиться попередження. Натисніть:
+
+Promote this server to a domain controller
+
+
+
+
+
+
+
+
+2.2. Оберіть Add a new forest і в полі Root domain name введіть:
+
+identity-lab.local
+
+Натисніть Next.
+
+
+
+
+
+
+2.3. Залиште увімкненими:
+
+Domain Name System (DNS) server
+Global Catalog (GC)
+
+2.4. Встановіть Directory Services Restore Mode password — окремий пароль для аварійного відновлення Active Directory. Збережіть його в надійному місці.
+
+
+
+
+
+
+
+
+2.5. На сторінці DNS Options може з’явитися попередження:
+
+A delegation for this DNS server cannot be created
+
+
+
+
+
+
+Для нового лабораторного forest це очікувано. Натисніть Next.
+
+2.6. Перевірте NetBIOS name. Система запропонує:
+
+IDENTITY-LAB
+
+Залиште це значення й натисніть Next.
+
+
+
+
+
+
+2.7. Для шляхів Database folder, Log files folder і SYSVOL folder залиште стандартні значення.
+
+2.8. Запустіть prerequisite check. Якщо перевірки виконані, натисніть Install. Сервер автоматично перезавантажиться.
+
+
+
+
+
+
+⚠️ Якщо promotion не проходить
+Див. документ «Troubleshooting лабораторних робіт», п. 3.1 «Promotion до контролера домену не проходить».
+
+
+3. Увійдіть після створення домену
+
+Після перезапуску увійдіть як доменний адміністратор. Логін може відображатися як:
+
+IDENTITY-LAB\Administrator
+
+або:
+
+Administrator@identity-lab.local
+
+Для GCP username, створений через Set Windows password, може відрізнятися. Перевірте доступні облікові записи на екрані входу.
+
+⚠️ Якщо не вдається увійти
+Див. документ «Troubleshooting лабораторних робіт», п. 3.2 «Після перезавантаження не вдається увійти».
+
+
+🟧 ЧАСТИНА 4. ПЕРЕВІРКА ДОМЕНУ ТА НАЛАШТУВАННЯ DNS
+
+
+
+1. Перевірте ролі AD DS і DNS
+
+1.1. У Server Manager перевірте розділи AD DS і DNS. У них не повинно бути критичних помилок.
+
+1.2. Перейдіть до Server Manager → Tools і перевірте наявність панелей:
+
+Active Directory Users and Computers
+DNS
+Active Directory Administrative Center
+Group Policy Management
+
+
+
+
+
+
+2. Перевірте інформацію про домен
+
+2.1. У PowerShell виконайте:
+
+Get-ADDomain
+
+У результаті має бути:
+
+DNSRoot: identity-lab.local
+NetBIOSName: IDENTITY-LAB
+
+
+
+
+
+
+2.2. Перевірте forest:
+
+Get-ADForest
+
+2.3. Перевірте контролер домену:
+
+Get-ADDomainController
+
+
+
+
+Очікуване hostname — DC01, повне ім’я — dc01.identity-lab.local.
+
+3. Перевірте DNS
+
+3.1. Перевірте домен:
+
+nslookup identity-lab.local
+
+Команда має повернути IP контролера домену.
+
+3.2. Перевірте контролер домену:
+
+nslookup dc01.identity-lab.local
+
+Команда має повернути внутрішню IP-адресу Windows Server.
+
+
+
+
+3.3. Перевірте SRV-записи:
+
+nslookup -type=SRV _ldap._tcp.dc._msdcs.identity-lab.local
+
+У результаті має бути вказаний dc01.identity-lab.local.
+
+SRV-запис допомагає клієнтам знаходити LDAP-службу контролера домену.
+
+⚠️ Якщо nslookup не повертає IP
+Див. документ «Troubleshooting лабораторних робіт», п. 3.3 «nslookup не повертає IP-адресу домену».
+
+
+4. Налаштуйте DNS forwarders
+
+Active Directory DNS відповідає за зону identity-lab.local. Щоб сервер також міг знаходити зовнішні домени, налаштуйте forwarders.
+
+4.1. Відкрийте:
+
+Server Manager → Tools → DNS
+
+4.2. Натисніть правою кнопкою на DC01 і оберіть:
+
+Properties → Forwarders
+
+4.3. Додайте зовнішній DNS, наприклад:
+
+1.1.1.1
+
+
+
+
+
+
+Або DNS вашої мережі. Натисніть OK.
+
+
+
+
+4.4. Перевірте:
+
+nslookup microsoft.com
+
+
+
+
+
+
+
+
+🟪 ЧАСТИНА 5. СТВОРЕННЯ СТРУКТУРИ КАТАЛОГУ
+
+
+
+1. Створіть організаційні підрозділи
+
+1.1. Відкрийте:
+
+Server Manager → Tools → Active Directory Users and Computers
+
+
+
+
+
+
+Розгорніть identity-lab.local.
+
+1.2. Натисніть правою кнопкою на домен і оберіть:
+
+New → Organizational Unit
+
+
+
+
+
+
+Введіть назву:
+
+Northstar
+
+Залиште увімкненим Protect container from accidental deletion.
+
+
+
+
+
+
+1.3. Усередині Northstar створіть три OU:
+
+Users
+Groups
+Service Accounts
+
+1.4. Усередині Users створіть три OU:
+
+Engineering
+Finance
+IT
+
+Очікувана структура:
+
+Northstar
+├── Users
+│   ├── Engineering
+│   ├── Finance
+│   └── IT
+├── Groups
+└── Service Accounts
+
+
+
+
+
+
+2. Створіть групи
+
+Перейдіть до Northstar → Groups і створіть групи через:
+
+Right click → New → Group
+
+Усі групи мають Group scope: Global і Group type: Security:
+
+app-portal-users
+app-portal-admins
+department-engineering
+department-finance
+department-it
+Групи матимуть аналогічні налаштування:
+
+
+
+
+
+
+
+
+3. Створіть тестових користувачів
+
+Створіть чотирьох користувачів:
+
+Anna Kovalenko — username anna.kovalenko, OU Engineering
+
+
+
+
+
+Mark Brown — username mark.brown, OU Engineering
+
+
+
+
+
+
+
+Olena Bondar — username olena.bondar, OU Finance
+
+
+
+
+
+Ivan Melnyk — username ivan.melnyk, OU IT
+
+
+
+Для кожного користувача:
+
+3.1. Відкрийте відповідний OU.
+
+3.2. Натисніть:
+
+Right click → New → User
+
+3.3. Заповніть ім’я та username.
+
+3.4. Встановіть тимчасовий пароль.
+
+3.5. Увімкніть:
+
+User must change password at next logon
+
+У реальному середовищі тимчасовий пароль обов’язково змінюється під час першого входу. У цій лабораторній тестові користувачі не входять на доменні комп’ютери, тому опцію можна вимкнути — це спрощення навчального середовища.
+
+
+4. Додайте користувачів до груп
+
+Щоб додати користувача до групи:
+
+User → Properties → Member Of → Add
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Потрібне членство:
+
+Anna Kovalenko — app-portal-users, department-engineering
+Mark Brown — app-portal-users, department-engineering
+Olena Bondar — app-portal-users, department-finance
+Ivan Melnyk — app-portal-users, app-portal-admins, department-it
+
+
+5. Перевірте користувачів і групи через PowerShell
+
+5.1. Перевірте користувачів:
+
+Get-ADUser -Filter * -SearchBase "OU=Users,OU=Northstar,DC=identity-lab,DC=local"
+
+5.2. Перевірте групи:
+
+Get-ADGroup -Filter * -SearchBase "OU=Groups,OU=Northstar,DC=identity-lab,DC=local"
+
+5.3. Перевірте членство Anna Kovalenko:
+
+Get-ADPrincipalGroupMembership anna.kovalenko |
+  Select-Object Name
+
+
+
+6. Створіть сервісний обліковий запис
+
+У Northstar → Service Accounts створіть користувача:
+
+First name: Keycloak
+Last name: LDAP
+Username: svc-keycloak-ldap
+
+6.1. Встановіть окремий складний пароль.
+
+6.2. Для лабораторної увімкніть:
+
+Password never expires
+
+У реальному середовищі для сервісних облікових записів застосовують контрольовану ротацію паролів або керовані сервісні облікові записи (Managed Service Accounts). Тут використовується спрощена лабораторна модель.
+6.3. Не додавайте цей обліковий запис до груп:
+
+Domain Admins
+Enterprise Admins
+Administrators
+
+На цьому етапі йому достатньо стандартного права читання каталогу. Цей обліковий запис Keycloak використовуватиме для підключення до каталогу в наступній лабораторній.
+
+
+
+🟥 ЧАСТИНА 6. ПІДГОТОВКА ДО ПІДКЛЮЧЕННЯ KEYCLOAK
+
+
+
+1. Додайте DNS-запис для Keycloak
+
+Щоб Active Directory DNS міг знаходити Keycloak за іменем sso.identity-lab.local, створіть A-запис.
+
+1.1. Відкрийте:
+
+Server Manager → Tools → DNS
+
+1.2. Перейдіть до:
+
+Forward Lookup Zones → identity-lab.local
+
+
+
+
+
+
+1.3. Натисніть:
+
+Right click → New Host (A or AAAA)
+
+
+
+
+
+
+1.4. Вкажіть:
+
+Name: sso
+IP address: KEYCLOAK_INTERNAL_IP
+
+Використовуйте саме внутрішню IP-адресу Keycloak VM.
+
+
+
+
+
+
+1.5. Перевірте у PowerShell:
+
+nslookup sso.identity-lab.local
+
+Команда має повернути внутрішню IP-адресу Keycloak.
+
+
+
+
+2. Перевірте DNS з Keycloak VM
+
+Щоб Keycloak VM знаходила домен identity-lab.local, вона повинна використовувати DNS контролера домену.
+
+На Keycloak VM виконайте запит, явно вказавши DNS-сервер:
+
+nslookup dc01.identity-lab.local AD_INTERNAL_IP
+
+Наприклад:
+
+nslookup dc01.identity-lab.local 10.128.0.20
+
+Якщо nslookup не встановлений:
+
+sudo apt update
+sudo apt install -y dnsutils
+
+
+
+3. Перевірте LDAP-порт
+
+На Keycloak VM перевірте доступність стандартного LDAP-порту:
+
+nc -zv AD_INTERNAL_IP 389
+
+Якщо nc відсутній:
+
+sudo apt install -y netcat-openbsd
+
+Очікуваний результат:
+
+Connection to AD_INTERNAL_IP 389 port [tcp/ldap] succeeded
+
+Ця перевірка не налаштовує LDAP-федерацію. Вона лише підтверджує, що Keycloak VM може встановити мережеве з’єднання з контролером домену.
+
+
+
+✅ ПІДСУМКОВА ПЕРЕВІРКА
+
+Переконайтеся, що:
+
+Windows Server має ім’я DC01;
+створено домен identity-lab.local;
+працюють AD DS і DNS;
+dc01.identity-lab.local резолвиться у внутрішню IP сервера;
+sso.identity-lab.local резолвиться у внутрішню IP Keycloak;
+створені OU Users, Groups і Service Accounts;
+створено чотирьох тестових користувачів;
+створено п’ять груп;
+користувачів додано до відповідних груп;
+створено обліковий запис svc-keycloak-ldap;
+Keycloak VM бачить LDAP-порт 389.
+Це середовище буде використано в наступній лабораторній роботі, тому не видаляйте створені VM, домен і облікові записи.
+
+
+
+ВИМОГИ ДО ЗВІТУ
+
+1. Скріншоти основних етапів
+
+створення віртуальної машини з Windows Server;
+установка ролей Active Directory Domain Services та DNS Server;
+створення нового домену;
+структура OU з користувачами в Active Directory;
+перевірка роботи DNS.
+2. Короткий опис дій
+
+До кожного скріншоту — 2–3 речення:
+
+що саме ви налаштовували;
+чи вдалося досягти очікуваного результату.
+3. Висновок
+
+Підтвердження, що:
+
+AD-домен успішно створено;
+користувачів і групи додано;
+система готова до інтеграції з Keycloak через LDAP.

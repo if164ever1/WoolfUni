@@ -1,0 +1,108 @@
+final_DevOps_Ihor_Zador/
+├── charts/
+│   └── django-app/
+│       ├── templates/
+│       │   ├── _helpers.tpl
+│       │   ├── configmap.yaml
+│       │   ├── deployment.yaml
+│       │   ├── hpa.yaml
+│       │   ├── NOTES.txt
+│       │   ├── pdb.yaml
+│       │   ├── service.yaml
+│       │   └── serviceaccount.yaml
+│       ├── Chart.yaml
+│       └── values.yaml
+├── Django/
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── asgi.py
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   └── wsgi.py
+│   ├── health/
+│   │   ├── __init__.py
+│   │   ├── apps.py
+│   │   ├── tests.py
+│   │   ├── urls.py
+│   │   └── views.py
+│   ├── .dockerignore
+│   ├── docker-compose.yaml
+│   ├── Dockerfile
+│   ├── Jenkinsfile
+│   ├── manage.py
+│   └── requirements.txt
+├── modules/
+│   ├── argo_cd/
+│   │   ├── charts/
+│   │   │   ├── templates/
+│   │   │   │   ├── application.yaml
+│   │   │   │   └── repository.yaml
+│   │   │   ├── Chart.yaml
+│   │   │   └── values.yaml
+│   │   ├── argo_cd.tf
+│   │   ├── outputs.tf
+│   │   ├── providers.tf
+│   │   ├── values.yaml
+│   │   └── variables.tf
+│   ├── ecr/
+│   │   ├── ecr.tf
+│   │   ├── outputs.tf
+│   │   ├── variables.tf
+│   │   └── versions.tf
+│   ├── eks/
+│   │   ├── aws_ebs_csi_driver.tf
+│   │   ├── eks.tf
+│   │   ├── outputs.tf
+│   │   ├── variables.tf
+│   │   └── versions.tf
+│   ├── jenkins/
+│   │   ├── jenkins.tf
+│   │   ├── outputs.tf
+│   │   ├── providers.tf
+│   │   ├── values.yaml
+│   │   └── variables.tf
+│   ├── monitoring/
+│   │   ├── monitoring.tf
+│   │   ├── outputs.tf
+│   │   ├── providers.tf
+│   │   ├── values.yaml
+│   │   └── variables.tf
+│   ├── rds/
+│   │   ├── aurora.tf
+│   │   ├── locals.tf
+│   │   ├── outputs.tf
+│   │   ├── rds.tf
+│   │   ├── README.md
+│   │   ├── shared.tf
+│   │   ├── variables.tf
+│   │   └── versions.tf
+│   ├── s3-backend/
+│   │   ├── dynamodb.tf
+│   │   ├── outputs.tf
+│   │   ├── s3.tf
+│   │   ├── variables.tf
+│   │   └── versions.tf
+│   └── vpc/
+│       ├── outputs.tf
+│       ├── routes.tf
+│       ├── variables.tf
+│       ├── versions.tf
+│       └── vpc.tf
+├── scripts/
+│   ├── apply.ps1
+│   ├── destroy.ps1
+│   └── verify.ps1
+├── .gitignore
+├── ARCHITECTURE.md
+├── backend.hcl.example
+├── backend.tf
+├── locals.tf
+├── main.tf
+├── outputs.tf
+├── PROJECT_STRUCTURE.txt
+├── providers.tf
+├── README.md
+├── terraform.tfvars.example
+├── VALIDATION.md
+├── variables.tf
+└── versions.tf

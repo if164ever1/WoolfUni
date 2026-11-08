@@ -1,0 +1,5 @@
+apiVersion: v2
+name: django-app
+description: Django application Helm chart inherited from previous homework
+version: 0.1.0
+appVersion: "1.0.0"

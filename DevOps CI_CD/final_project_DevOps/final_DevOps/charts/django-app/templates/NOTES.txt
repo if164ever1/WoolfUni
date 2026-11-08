@@ -1,0 +1,7 @@
+Django application deployed.
+
+Check resources:
+  kubectl get deployment,pods,service,hpa -n {{ .Release.Namespace }}
+
+Local access:
+  kubectl port-forward svc/{{ include "django-app.fullname" . }} 8000:{{ .Values.service.port }} -n {{ .Release.Namespace }}

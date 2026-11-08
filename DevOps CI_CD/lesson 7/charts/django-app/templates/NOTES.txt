@@ -1,0 +1,5 @@
+1. Wait for the AWS load balancer:
+   kubectl get service {{ include "django-app.fullname" . }} --watch
+
+2. Test the application:
+   curl http://<EXTERNAL-IP-or-HOSTNAME>/

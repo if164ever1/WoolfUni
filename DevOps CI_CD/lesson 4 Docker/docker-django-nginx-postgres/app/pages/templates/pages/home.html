@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Django Docker Portfolio App</title>
+</head>
+<body>
+    <h1>Django + PostgreSQL + Docker + Nginx Project</h1>
+
+    <p>
+        This page is served by Django running inside a Docker container.
+        The request first goes through Nginx, then reaches Django/Gunicorn,
+        and the data is loaded from PostgreSQL.
+    </p>
+
+    <h2>Project Features</h2>
+
+    {% for feature in features %}
+        <article>
+            <h3>{{ feature.title }}</h3>
+            <p>{{ feature.description }}</p>
+        </article>
+    {% empty %}
+        <p>No project features found in the database.</p>
+    {% endfor %}
+
+    <hr>
+
+    <p>
+        Current architecture: Browser → Nginx → Django/Gunicorn → PostgreSQL.
+    </p>
+</body>
+</html>

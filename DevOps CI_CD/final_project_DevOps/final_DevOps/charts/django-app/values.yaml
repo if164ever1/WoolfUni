@@ -1,0 +1,83 @@
+replicaCount: 2
+
+image:
+  repository: REPLACE_BY_JENKINS_OR_ARGO_PARAMETER
+  tag: bootstrap
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: "django-app"
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+  automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+config:
+  DJANGO_SETTINGS_MODULE: app.settings
+  APP_MESSAGE: Django was deployed through Jenkins, ECR, Argo CD and Helm.
+  IMAGE_TAG: bootstrap
+  DATABASE_ENGINE: postgresql
+  DATABASE_HOST: ""
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: appdb
+  DATABASE_USER: dbadmin
+
+existingDatabaseSecret: django-app-database
+
+livenessProbe:
+  httpGet:
+    path: /health/
+    port: http
+  initialDelaySeconds: 20
+  periodSeconds: 15
+
+readinessProbe:
+  httpGet:
+    path: /health/
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10

@@ -1,0 +1,65 @@
+replicaCount: 2
+
+image:
+  repository: REPLACE_WITH_ECR_REPOSITORY_URL
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 8000
+  annotations: {}
+
+config:
+  DJANGO_DEBUG: "False"
+  DJANGO_ALLOWED_HOSTS: "*"
+  DATABASE_ENGINE: "sqlite"
+  POSTGRES_DB: "portfolio"
+  POSTGRES_USER: "portfolio_user"
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+
+# For a real deployment, store DJANGO_SECRET_KEY and database passwords in a
+# Kubernetes Secret or AWS Secrets Manager rather than ConfigMap.
+secret:
+  create: true
+  DJANGO_SECRET_KEY: "replace-before-production"
+  POSTGRES_PASSWORD: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+probes:
+  readiness:
+    path: /health/
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  liveness:
+    path: /health/
+    initialDelaySeconds: 15
+    periodSeconds: 20
+
+ingress:
+  enabled: false
+  className: nginx
+  host: yourdomain.com
+  path: /
+  pathType: Prefix
+  tls: false
+  clusterIssuer: letsencrypt-prod
+  secretName: django-app-tls

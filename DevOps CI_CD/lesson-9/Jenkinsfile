@@ -1,0 +1,221 @@
+pipeline {
+  agent {
+    kubernetes {
+      defaultContainer 'git'
+      yaml '''
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    workload: django-cicd
+spec:
+  serviceAccountName: jenkins-agent
+  securityContext:
+    fsGroup: 1000
+  containers:
+    - name: git
+      image: bitnami/git:2.49.0
+      command: ["/bin/sh", "-c", "cat"]
+      tty: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:v1.23.2-debug
+      command: ["/busybox/cat"]
+      tty: true
+      env:
+        - name: AWS_SDK_LOAD_CONFIG
+          value: "true"
+        - name: AWS_EC2_METADATA_DISABLED
+          value: "true"
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 2Gi
+    - name: python
+      image: python:3.12-slim
+      command: ["/bin/sh", "-c", "cat"]
+      tty: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    - name: yq
+      image: mikefarah/yq:4.45.4
+      command: ["/bin/sh", "-c", "cat"]
+      tty: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+  restartPolicy: Never
+'''
+    }
+  }
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    skipDefaultCheckout(true)
+    timeout(time: 30, unit: 'MINUTES')
+  }
+
+  stages {
+    stage('Checkout source') {
+      steps {
+        checkout scm
+        script {
+          env.SHORT_SHA = sh(script: 'git rev-parse --short=8 HEAD', returnStdout: true).trim()
+          env.PROJECT_DIR = fileExists('application/Dockerfile') ? '.' : 'DevOps CI_CD/lesson-8-9'
+          env.APP_DIR = "${env.PROJECT_DIR}/application"
+          if (!fileExists("${env.APP_DIR}/Dockerfile")) {
+            error("Django application directory was not found at ${env.APP_DIR}")
+          }
+          env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.SHORT_SHA}"
+          currentBuild.displayName = "#${env.BUILD_NUMBER} ${env.SHORT_SHA}"
+        }
+      }
+    }
+
+    stage('Test Django') {
+      steps {
+        container('python') {
+          sh '''
+            set -eu
+            cd "$APP_DIR"
+            python -m pip install --disable-pip-version-check --no-cache-dir -r requirements.txt
+            python manage.py check
+            python manage.py test
+          '''
+        }
+      }
+    }
+
+    stage('Build and push image with Kaniko') {
+      steps {
+        container('kaniko') {
+          sh '''
+            set -eu
+            /kaniko/executor \
+              --context "${WORKSPACE}/${APP_DIR}" \
+              --dockerfile "${WORKSPACE}/${APP_DIR}/Dockerfile" \
+              --destination "${ECR_REPOSITORY_URI}:${IMAGE_TAG}" \
+              --snapshot-mode=redo \
+              --use-new-run
+          '''
+        }
+      }
+    }
+
+    stage('Clone GitOps repository') {
+      steps {
+        container('git') {
+          withCredentials([usernamePassword(
+            credentialsId: 'github-pat',
+            usernameVariable: 'GIT_USERNAME',
+            passwordVariable: 'GIT_TOKEN'
+          )]) {
+            sh '''
+              set -eu
+              rm -rf gitops-worktree
+              cat > /tmp/git-askpass.sh <<'EOF'
+#!/bin/sh
+case "$1" in
+  *Username*) echo "$GIT_USERNAME" ;;
+  *Password*) echo "$GIT_TOKEN" ;;
+esac
+EOF
+              chmod 700 /tmp/git-askpass.sh
+              export GIT_ASKPASS=/tmp/git-askpass.sh
+              export GIT_TERMINAL_PROMPT=0
+              git clone --branch "$GITOPS_BRANCH" --single-branch "$GITOPS_REPO_URL" gitops-worktree
+              rm -f /tmp/git-askpass.sh
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Update Helm image values') {
+      steps {
+        container('yq') {
+          sh '''
+            set -eu
+            cd gitops-worktree
+            test -f "$GITOPS_VALUES_FILE"
+            export IMAGE_TAG ECR_REPOSITORY_URI
+            yq -i '.image.repository = strenv(ECR_REPOSITORY_URI)' "$GITOPS_VALUES_FILE"
+            yq -i '.image.tag = strenv(IMAGE_TAG)' "$GITOPS_VALUES_FILE"
+            yq -i '.config.IMAGE_TAG = strenv(IMAGE_TAG)' "$GITOPS_VALUES_FILE"
+          '''
+        }
+      }
+    }
+
+    stage('Commit desired state') {
+      steps {
+        container('git') {
+          withCredentials([usernamePassword(
+            credentialsId: 'github-pat',
+            usernameVariable: 'GIT_USERNAME',
+            passwordVariable: 'GIT_TOKEN'
+          )]) {
+            sh '''
+              set -eu
+              cd gitops-worktree
+              git config user.name "Jenkins CI"
+              git config user.email "jenkins@lesson-8-9.local"
+
+              if git diff --quiet -- "$GITOPS_VALUES_FILE"; then
+                echo "GitOps values already contain image ${ECR_REPOSITORY_URI}:${IMAGE_TAG}."
+                exit 0
+              fi
+
+              git add "$GITOPS_VALUES_FILE"
+              git commit -m "deploy: ${ECR_REPOSITORY_URI}:${IMAGE_TAG}"
+
+              cat > /tmp/git-askpass.sh <<'EOF'
+#!/bin/sh
+case "$1" in
+  *Username*) echo "$GIT_USERNAME" ;;
+  *Password*) echo "$GIT_TOKEN" ;;
+esac
+EOF
+              chmod 700 /tmp/git-askpass.sh
+              export GIT_ASKPASS=/tmp/git-askpass.sh
+              export GIT_TERMINAL_PROMPT=0
+              git push origin "HEAD:${GITOPS_BRANCH}"
+              rm -f /tmp/git-askpass.sh
+            '''
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Published ${ECR_REPOSITORY_URI}:${IMAGE_TAG}; Argo CD will reconcile the GitOps commit."
+    }
+    failure {
+      echo "Pipeline failed. Review the first failed stage and the Kubernetes agent pod logs."
+    }
+    always {
+      deleteDir()
+    }
+  }
+}

@@ -1,0 +1,171 @@
+pipeline {
+  agent {
+    kubernetes {
+      defaultContainer 'git'
+      yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: ${env.JENKINS_AGENT_SERVICE_ACCOUNT}
+  restartPolicy: Never
+  containers:
+    - name: git
+      image: alpine/git:latest
+      command: ['cat']
+      tty: true
+    - name: python
+      image: python:3.13-slim
+      command: ['cat']
+      tty: true
+    - name: kaniko
+      image: gcr.io/kaniko-project/executor:v1.23.2-debug
+      command: ['/busybox/cat']
+      tty: true
+      env:
+        - name: AWS_SDK_LOAD_CONFIG
+          value: "true"
+        - name: AWS_EC2_METADATA_DISABLED
+          value: "true"
+    - name: yq
+      image: mikefarah/yq:4.45.1
+      command: ['/bin/sh', '-c', 'cat']
+      tty: true
+"""
+    }
+  }
+
+  options {
+    skipDefaultCheckout(true)
+    disableConcurrentBuilds()
+    timestamps()
+  }
+
+  environment {
+    APP_DIR = 'Django'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+        script {
+          env.GIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+          env.IMAGE_TAG = "${BUILD_NUMBER}-${env.GIT_SHA}"
+          env.SKIP_CI = sh(
+            script: "git log -1 --pretty=%B | grep -q '\\[skip ci\\]'",
+            returnStatus: true
+          ) == 0 ? 'true' : 'false'
+        }
+      }
+    }
+
+    stage('Test') {
+      when {
+        expression { env.SKIP_CI != 'true' }
+      }
+      steps {
+        container('python') {
+          sh '''
+            cd "$SOURCE_PROJECT_PATH/$APP_DIR"
+            python -m pip install --no-cache-dir -r requirements.txt
+            DATABASE_ENGINE=sqlite python manage.py check
+            DATABASE_ENGINE=sqlite python manage.py test
+          '''
+        }
+      }
+    }
+
+    stage('Build and Push to ECR') {
+      when {
+        expression { env.SKIP_CI != 'true' }
+      }
+      steps {
+        container('kaniko') {
+          sh '''
+            /kaniko/executor \
+              --context "${WORKSPACE}/${SOURCE_PROJECT_PATH}/${APP_DIR}" \
+              --dockerfile "${WORKSPACE}/${SOURCE_PROJECT_PATH}/${APP_DIR}/Dockerfile" \
+              --destination "${ECR_REPOSITORY_URL}:${IMAGE_TAG}" \
+              --snapshot-mode=redo \
+              --use-new-run
+          '''
+        }
+      }
+    }
+
+    stage('Update GitOps Values') {
+      when {
+        expression { env.SKIP_CI != 'true' }
+      }
+      steps {
+        container('git') {
+          withCredentials([usernamePassword(
+            credentialsId: 'github-token',
+            usernameVariable: 'GIT_USERNAME',
+            passwordVariable: 'GIT_TOKEN'
+          )]) {
+            sh '''
+              rm -rf gitops-worktree
+              set +x
+              AUTH_URL=$(printf '%s' "$GITOPS_REPO_URL" | sed "s#https://#https://${GIT_USERNAME}:${GIT_TOKEN}@#")
+              git clone --branch "$GITOPS_BRANCH" --single-branch "$AUTH_URL" gitops-worktree
+              set -x
+            '''
+          }
+        }
+
+        container('yq') {
+          sh '''
+            export IMAGE_REPOSITORY="$ECR_REPOSITORY_URL"
+            export NEW_IMAGE_TAG="$IMAGE_TAG"
+            yq -i '.image.repository = strenv(IMAGE_REPOSITORY) | .image.tag = strenv(NEW_IMAGE_TAG) | .config.IMAGE_TAG = strenv(NEW_IMAGE_TAG)' "gitops-worktree/$GITOPS_VALUES_PATH"
+          '''
+        }
+
+        container('git') {
+          withCredentials([usernamePassword(
+            credentialsId: 'github-token',
+            usernameVariable: 'GIT_USERNAME',
+            passwordVariable: 'GIT_TOKEN'
+          )]) {
+            sh '''
+              cd gitops-worktree
+              git config user.name "Jenkins CI"
+              git config user.email "jenkins@local"
+              git add "$GITOPS_VALUES_PATH"
+
+              if git diff --cached --quiet; then
+                echo "No GitOps change to commit."
+                exit 0
+              fi
+
+              git commit -m "Deploy ${IMAGE_TAG} [skip ci]"
+              set +x
+              AUTH_URL=$(printf '%s' "$GITOPS_REPO_URL" | sed "s#https://#https://${GIT_USERNAME}:${GIT_TOKEN}@#")
+              git push "$AUTH_URL" "HEAD:${GITOPS_BRANCH}"
+              set -x
+            '''
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      script {
+        if (env.SKIP_CI == 'true') {
+          echo 'Commit contains [skip ci]; build and deployment stages were intentionally skipped.'
+        } else {
+          echo "Image ${ECR_REPOSITORY_URL}:${IMAGE_TAG} was pushed and the GitOps desired state was updated."
+        }
+      }
+    }
+    failure {
+      echo 'Pipeline failed. Check the failed stage and Jenkins agent logs.'
+    }
+    always {
+      deleteDir()
+    }
+  }
+}

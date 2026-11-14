@@ -1,0 +1,63 @@
+{
+  "mysql_version": "8.4.4",
+  "runs": [
+    {
+      "seconds": 5,
+      "id": "manual__demo_5s",
+      "states": {
+        "create_table": "success",
+        "choose_medal": "success",
+        "branch_by_medal": "success",
+        "count_bronze": "skipped",
+        "count_silver": "skipped",
+        "count_gold": "success",
+        "delay_before_sensor": "success",
+        "check_latest_record": "success"
+      },
+      "age_s": "8.223",
+      "state": "success",
+      "row": [
+        1,
+        "Gold",
+        4,
+        "2026-11-14 22:38:31.295014"
+      ]
+    },
+    {
+      "seconds": 35,
+      "id": "manual__demo_35s",
+      "states": {
+        "create_table": "success",
+        "choose_medal": "success",
+        "branch_by_medal": "success",
+        "count_bronze": "success",
+        "count_silver": "skipped",
+        "count_gold": "skipped",
+        "delay_before_sensor": "success",
+        "check_latest_record": "failed"
+      },
+      "age_s": "38.482",
+      "state": "failed",
+      "row": [
+        2,
+        "Bronze",
+        2,
+        "2026-11-14 22:38:48.018925"
+      ]
+    }
+  ],
+  "rows": [
+    [
+      1,
+      "Gold",
+      4,
+      "2026-11-14 22:38:31.295014"
+    ],
+    [
+      2,
+      "Bronze",
+      2,
+      "2026-11-14 22:38:48.018925"
+    ]
+  ]
+}

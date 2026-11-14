@@ -1,0 +1,36 @@
+services:
+  mysql:
+    image: mysql:8.4.4
+    environment:
+      MYSQL_ROOT_PASSWORD: local_only_root
+      MYSQL_DATABASE: airflow_hw07
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./local/init-demo.sql:/docker-entrypoint-initdb.d/10-olympics.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysql --protocol=TCP -h 127.0.0.1 -uolympic_demo -polympic_demo -Dairflow_hw07 -Nse 'SELECT COUNT(*) FROM olympic_dataset.athlete_event_results'"]
+      interval: 3s
+      timeout: 3s
+      retries: 50
+      start_period: 10s
+  airflow:
+    build: .
+    command: standalone
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+      AIRFLOW__SCHEDULER__SCHEDULER_HEARTBEAT_SEC: "1"
+      AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: UTC
+      AIRFLOW_CONN_OLYMPIC_MYSQL: '{"conn_type":"mysql","host":"mysql","login":"olympic_demo","password":"olympic_demo","port":3306,"schema":"airflow_hw07","extra":{"client":"mysql-connector-python"}}'
+    volumes:
+      - ./dags:/opt/airflow/dags:ro
+      - ./tests:/opt/airflow/hw-tests:ro
+      - airflow-data:/opt/airflow
+volumes:
+  mysql-data:
+  airflow-data:

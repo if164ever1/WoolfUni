@@ -1,0 +1,4 @@
+Kafka output messages: 10,969
+Distinct Kafka groups: 10,879
+MySQL result groups: 10,879
+PASS: all group keys, averages and UTC timestamps match

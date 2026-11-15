@@ -1,0 +1,11 @@
+Kafka output topic: athlete_avg_stats
+[partition 2 · offset 0]
+{"sport":"Sailing","medal":"No medal","sex":"Female","country_noc":"ARU","avg_height":169.5,"avg_weight":63.5,"timestamp":"2026-11-15T00:25:51.673425Z"}
+[partition 2 · offset 1]
+{"sport":"Shooting","medal":"No medal","sex":"Female","country_noc":"BAN","avg_height":154.0,"avg_weight":53.666666666666664,"timestamp":"2026-11-15T00:25:51.673425Z"}
+[partition 2 · offset 2]
+{"sport":"Athletics","medal":"No medal","sex":"Male","country_noc":"ANT","avg_height":179.16,"avg_weight":70.17333333333333,"timestamp":"2026-11-15T00:25:51.673425Z"}
+[partition 2 · offset 3]
+{"sport":"Wrestling","medal":"No medal","sex":"Male","country_noc":"ASA","avg_height":184.0,"avg_weight":107.5,"timestamp":"2026-11-15T00:25:51.673425Z"}
+[partition 2 · offset 4]
+{"sport":"Boxing","medal":"No medal","sex":"Male","country_noc":"BEN","avg_height":167.84615384615384,"avg_weight":61.07692307692308,"timestamp":"2026-11-15T00:25:51.673425Z"}
